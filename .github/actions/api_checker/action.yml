@@ -34,6 +34,10 @@ inputs:
     description: "Git ref to checkout for ARMOR tool repo"
     required: false
     default: "main"
+  approvers-file:
+    description: "Path to the approvers file in the caller's repo (relative to repo root). Defaults to .github/armor-approvers.txt"
+    required: false
+    default: ".github/armor-approvers.txt"
 
 runs:
   using: "composite"
@@ -406,6 +410,20 @@ runs:
           echo "$delimiter"
         } >> "$GITHUB_OUTPUT"
 
+    - name: Check ARMOR exception label
+      id: exception-check
+      if: >-
+        ${{ steps.compatibility_status.outputs.res == 'failure' &&
+            (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+      shell: bash
+      env:
+        PR_NUMBER:          ${{ github.event.pull_request.number }}
+        GITHUB_REPOSITORY:  ${{ github.repository }}
+        GH_TOKEN:           ${{ github.token }}
+      run: |
+        set -euo pipefail
+        bash "${{ github.action_path }}/scripts/check_exception_label.sh"
+
     - name: Fail if incompatible changes detected
       if: steps.intersection.outputs.has-intersection == 'true'
       shell: bash
@@ -414,8 +432,19 @@ runs:
         status="${{ steps.compatibility_status.outputs.res }}"
         printf '%s\n' "${{ steps.prepare-comment.outputs.body }}" >> "$GITHUB_STEP_SUMMARY"
         if [[ "$status" == "failure" ]]; then
-          echo "::error ::ARMOR detected backward incompatible changes in public headers. Failing the check."
-          exit 1
+          exception="${{ steps.exception-check.outputs.exception_approved }}"
+          if [[ "$exception" == "true" ]]; then
+            approver="${{ steps.exception-check.outputs.exception_approver }}"
+            {
+              echo ""
+              echo "### :white_check_mark: Exception Approved"
+              echo "Backward-incompatible changes approved by **${approver}** via \`armor-exception-approved\` label."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "ARMOR check: incompatible changes present but exception approved by ${approver}."
+          else
+            echo "::error::ARMOR detected backward incompatible changes in public headers. Failing the check."
+            exit 1
+          fi
         else
           echo "ARMOR check passed (status: $status)."
         fi
