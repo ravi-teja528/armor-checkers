@@ -34,10 +34,6 @@ inputs:
     description: "Git ref to checkout for ARMOR tool repo"
     required: false
     default: "main"
-  approvers-file:
-    description: "Path to the approvers file in the caller's repo (relative to repo root). Defaults to .github/armor-approvers.txt"
-    required: false
-    default: ".github/armor-approvers.txt"
 
 runs:
   using: "composite"
@@ -422,7 +418,7 @@ runs:
         GH_TOKEN:           ${{ github.token }}
       run: |
         set -euo pipefail
-        bash "${{ github.action_path }}/scripts/check_exception_label.sh"
+        bash "${{ github.action_path }}/scripts/check_exception_issue.sh"
 
     - name: Fail if incompatible changes detected
       if: steps.intersection.outputs.has-intersection == 'true'
@@ -438,7 +434,7 @@ runs:
             {
               echo ""
               echo "### :white_check_mark: Exception Approved"
-              echo "Backward-incompatible changes approved by **${approver}** via \`armor-exception-approved\` label."
+              echo "Backward-incompatible changes approved via linked exception issue."
             } >> "$GITHUB_STEP_SUMMARY"
             echo "ARMOR check: incompatible changes present but exception approved by ${approver}."
           else

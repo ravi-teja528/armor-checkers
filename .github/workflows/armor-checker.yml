@@ -19,11 +19,6 @@ on:
         required: false
         type: string
         default: ''
-      approvers-file:
-        required: false
-        type: string
-        default: '.github/armor-approvers.txt'
-        description: "Path to the approvers file in the caller's repo (relative to repo root)"
 
 permissions:
   contents: read
@@ -54,7 +49,6 @@ jobs:
           ref:         ${{ needs.prepare.outputs.ref }}
           repo:        ${{ needs.prepare.outputs.repo }}
           branch-name: ${{ needs.prepare.outputs.branch_name }}
-          approvers-file:  ${{ inputs.approvers-file }}
 
   abi-check:
     name: Run ABI check
