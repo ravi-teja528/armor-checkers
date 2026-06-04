@@ -406,6 +406,20 @@ runs:
           echo "$delimiter"
         } >> "$GITHUB_OUTPUT"
 
+    - name: Check ARMOR exception label
+      id: exception-check
+      if: >-
+        ${{ steps.compatibility_status.outputs.res == 'failure' &&
+            (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+      shell: bash
+      env:
+        PR_NUMBER:          ${{ github.event.pull_request.number }}
+        GITHUB_REPOSITORY:  ${{ github.repository }}
+        GH_TOKEN:           ${{ github.token }}
+      run: |
+        set -euo pipefail
+        bash "${{ github.action_path }}/scripts/check_exception_issue.sh"
+
     - name: Fail if incompatible changes detected
       if: steps.intersection.outputs.has-intersection == 'true'
       shell: bash
@@ -414,8 +428,18 @@ runs:
         status="${{ steps.compatibility_status.outputs.res }}"
         printf '%s\n' "${{ steps.prepare-comment.outputs.body }}" >> "$GITHUB_STEP_SUMMARY"
         if [[ "$status" == "failure" ]]; then
-          echo "::error ::ARMOR detected backward incompatible changes in public headers. Failing the check."
-          exit 1
+          exception="${{ steps.exception-check.outputs.exception_approved }}"
+          if [[ "$exception" == "true" ]]; then
+            {
+              echo ""
+              echo "### :white_check_mark: Exception Approved"
+              echo "Backward-incompatible changes approved via linked exception issue."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "ARMOR check: incompatible changes present but exception approved via linked issue."
+          else
+            echo "::error::ARMOR detected backward incompatible changes in public headers. Failing the check."
+            exit 1
+          fi
         else
           echo "ARMOR check passed (status: $status)."
         fi
