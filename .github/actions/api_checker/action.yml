@@ -34,6 +34,10 @@ inputs:
     description: "Git ref to checkout for ARMOR tool repo"
     required: false
     default: "main"
+  approvers-file:
+    description: "Path to the approvers file in the caller's repo (relative to repo root). Defaults to .github/armor-approvers.txt. One GitHub username per line."
+    required: false
+    default: ".github/armor-approvers.txt"
 
 runs:
   using: "composite"
@@ -416,6 +420,7 @@ runs:
         PR_NUMBER:          ${{ github.event.pull_request.number }}
         GITHUB_REPOSITORY:  ${{ github.repository }}
         GH_TOKEN:           ${{ github.token }}
+        APPROVERS_FILE:     ${{ github.workspace }}/head/${{ inputs.approvers-file }}
       run: |
         set -euo pipefail
         bash "${{ github.action_path }}/scripts/check_exception_issue.sh"
@@ -430,12 +435,13 @@ runs:
         if [[ "$status" == "failure" ]]; then
           exception="${{ steps.exception-check.outputs.exception_approved }}"
           if [[ "$exception" == "true" ]]; then
+            approver="${{ steps.exception-check.outputs.exception_approver }}"
             {
               echo ""
               echo "### :white_check_mark: Exception Approved"
-              echo "Backward-incompatible changes approved via linked exception issue."
+              echo "Backward-incompatible changes approved by **${approver}** via linked exception issue."
             } >> "$GITHUB_STEP_SUMMARY"
-            echo "ARMOR check: incompatible changes present but exception approved via linked issue."
+            echo "ARMOR check: incompatible changes present but exception approved by ${approver}."
           else
             echo "::error::ARMOR detected backward incompatible changes in public headers. Failing the check."
             exit 1
